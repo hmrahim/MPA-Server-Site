@@ -1,5 +1,50 @@
 const Event = require("../models/eventModel");
+const EventPageConfig = require("../models/eventModel").EventPageConfig;
 const Gallery = require("../models/galleryModel");
+
+const defaultPageConfig = {
+  badge: "Campus Vibrancy & Student Life",
+  badgeBn: "ক্যাম্পাস জীবন ও উৎসবের মুহূর্ত",
+  title: "Events Calendar & Photo Gallery",
+  titleBn: "ইভেন্ট ক্যালেন্ডার ও ফটো গ্যালারি",
+  subtitle:
+    "Explore our colorful campus festivities: from athletic championships and robotics exhibitions to national day celebrations and graduation ceremonies.",
+  subtitleBn:
+    "বার্ষিক ক্রীড়া প্রতিযোগিতা, বিজ্ঞান মেলা, সাংস্কৃতিক উৎসব ও জাতীয় দিবস উদযাপনের স্মৃতির অ্যালবাম।",
+  eventsBadge: "School Calendar",
+  eventsBadgeBn: "একাডেমিক ক্যালেন্ডার",
+  eventsTitle: "Academic Calendar & Upcoming Events",
+  eventsTitleBn: "একাডেমিক ক্যালেন্ডার ও আসন্ন অনুষ্ঠান",
+  eventsSubtitle:
+    "Stay updated with scheduled examinations, science olympiads, cultural meets, and national day observances.",
+  eventsSubtitleBn:
+    "পরীক্ষার সময়সূচি, বিজ্ঞান অলিম্পিয়াড, সাংস্কৃতিক সমাবেশ ও জাতীয় দিবসের সময়সূচি।",
+  galleryBadge: "Memories & Moments",
+  galleryBadgeBn: "স্মৃতি ও সোনালী মুহূর্ত",
+  galleryTitle: "Campus Life Photo Gallery",
+  galleryTitleBn: "ক্যাম্পাস জীবন ফটো গ্যালারি",
+  gallerySubtitle: "Click any image to view in high definition lightbox",
+  gallerySubtitleBn: "পূর্ণাঙ্গ আকারে দেখতে যেকোনো ছবিতে ক্লিক করুন",
+};
+
+const categoryBnMap = {
+  Academic: "একাডেমিক",
+  Exam: "পরীক্ষা",
+  Sports: "ক্রীড়া",
+  Cultural: "সাংস্কৃতিক",
+  Science: "বিজ্ঞান",
+  National: "জাতীয় দিবস",
+  Awards: "পুরস্কার",
+  Scouts: "স্কাউট",
+  Campus: "ক্যাম্পাস",
+};
+
+const statusBnMap = {
+  Upcoming: "আসন্ন",
+  Ongoing: "চলমান",
+  Completed: "সম্পন্ন",
+  "Registration Open": "নিবন্ধন চলছে",
+};
 
 const defaultEvents = [
   {
@@ -182,6 +227,44 @@ const defaultGallery = [
   },
 ];
 
+/* ── PAGE CONFIG CONTROLLERS ── */
+exports.getPageConfig = async (req, res) => {
+  try {
+    let config = await EventPageConfig.findOne();
+    if (!config) {
+      config = await EventPageConfig.create(defaultPageConfig);
+    }
+    res.json({ success: true, data: config });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updatePageConfig = async (req, res) => {
+  try {
+    let config = await EventPageConfig.findOne();
+    if (!config) {
+      config = new EventPageConfig(req.body);
+    } else {
+      Object.assign(config, req.body);
+    }
+    const saved = await config.save();
+    res.json({ success: true, data: saved, message: "Page configuration updated successfully" });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.resetPageConfig = async (req, res) => {
+  try {
+    await EventPageConfig.deleteMany({});
+    const config = await EventPageConfig.create(defaultPageConfig);
+    res.json({ success: true, data: config, message: "Page configuration reset to defaults" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /* ── EVENTS CONTROLLERS ── */
 exports.getEvents = async (req, res) => {
   try {
@@ -197,10 +280,17 @@ exports.getEvents = async (req, res) => {
 
 exports.createEvent = async (req, res) => {
   try {
+    const payload = { ...req.body };
+    if (!payload.categoryBn && payload.category && categoryBnMap[payload.category]) {
+      payload.categoryBn = categoryBnMap[payload.category];
+    }
+    if (!payload.statusBn && payload.status && statusBnMap[payload.status]) {
+      payload.statusBn = statusBnMap[payload.status];
+    }
     const count = await Event.countDocuments();
     const newEvent = new Event({
-      ...req.body,
-      order: req.body.order !== undefined ? req.body.order : count + 1,
+      ...payload,
+      order: payload.order !== undefined ? payload.order : count + 1,
     });
     const saved = await newEvent.save();
     res.status(201).json({ success: true, data: saved, message: "Event created successfully" });
@@ -211,7 +301,14 @@ exports.createEvent = async (req, res) => {
 
 exports.updateEvent = async (req, res) => {
   try {
-    const updated = await Event.findByIdAndUpdate(req.params.id, req.body, {
+    const payload = { ...req.body };
+    if (!payload.categoryBn && payload.category && categoryBnMap[payload.category]) {
+      payload.categoryBn = categoryBnMap[payload.category];
+    }
+    if (!payload.statusBn && payload.status && statusBnMap[payload.status]) {
+      payload.statusBn = statusBnMap[payload.status];
+    }
+    const updated = await Event.findByIdAndUpdate(req.params.id, payload, {
       new: true,
       runValidators: true,
     });
@@ -268,10 +365,14 @@ exports.getGallery = async (req, res) => {
 
 exports.createGalleryItem = async (req, res) => {
   try {
+    const payload = { ...req.body };
+    if (!payload.categoryBn && payload.category && categoryBnMap[payload.category]) {
+      payload.categoryBn = categoryBnMap[payload.category];
+    }
     const count = await Gallery.countDocuments();
     const newItem = new Gallery({
-      ...req.body,
-      order: req.body.order !== undefined ? req.body.order : count + 1,
+      ...payload,
+      order: payload.order !== undefined ? payload.order : count + 1,
     });
     const saved = await newItem.save();
     res.status(201).json({ success: true, data: saved, message: "Gallery image added successfully" });
@@ -282,7 +383,11 @@ exports.createGalleryItem = async (req, res) => {
 
 exports.updateGalleryItem = async (req, res) => {
   try {
-    const updated = await Gallery.findByIdAndUpdate(req.params.id, req.body, {
+    const payload = { ...req.body };
+    if (!payload.categoryBn && payload.category && categoryBnMap[payload.category]) {
+      payload.categoryBn = categoryBnMap[payload.category];
+    }
+    const updated = await Gallery.findByIdAndUpdate(req.params.id, payload, {
       new: true,
       runValidators: true,
     });
@@ -312,6 +417,59 @@ exports.resetGallery = async (req, res) => {
     await Gallery.deleteMany({});
     const seeded = await Gallery.insertMany(defaultGallery);
     res.json({ success: true, count: seeded.length, data: seeded, message: "Default gallery restored" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/* ── IMGBB UPLOAD CONTROLLER ── */
+exports.uploadImage = async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ success: false, message: "Image base64 or URL is required" });
+    }
+
+    const apiKey = process.env.IMGBB_API_KEY || "4d8f54c51bb726b496f79bc6709ddf3e";
+    const params = new URLSearchParams();
+
+    let cleanImage = image;
+    if (typeof image === "string" && image.startsWith("data:image")) {
+      // Strip data:image/...;base64, prefix
+      cleanImage = image.split(",")[1] || image;
+    } else if (typeof image === "string" && (image.startsWith("http://") || image.startsWith("https://"))) {
+      try {
+        const imgResponse = await fetch(image);
+        if (imgResponse.ok) {
+          const buffer = await imgResponse.arrayBuffer();
+          cleanImage = Buffer.from(buffer).toString("base64");
+        }
+      } catch {
+        // Fall through
+      }
+    }
+
+    params.append("image", cleanImage);
+
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      method: "POST",
+      body: params,
+    });
+
+    const data = await response.json();
+    if (data && data.success && data.data) {
+      const url = data.data.display_url || data.data.url;
+      res.status(200).json({
+        success: true,
+        url,
+        data: data.data,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: data?.error?.message || "ImgBB upload failed",
+      });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

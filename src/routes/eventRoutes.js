@@ -2,6 +2,14 @@ const express = require("express");
 const router = express.Router();
 const eventController = require("../controllers/eventController");
 
+// Page configuration routes (word to word bilingual banner and section headings)
+router.get("/page-config", eventController.getPageConfig);
+router.put("/page-config", eventController.updatePageConfig);
+router.post("/page-config/reset", eventController.resetPageConfig);
+
+// Upload image to ImgBB
+router.post("/upload-image", eventController.uploadImage);
+
 // Events routes
 router.get("/", eventController.getEvents);
 router.post("/", eventController.createEvent);
